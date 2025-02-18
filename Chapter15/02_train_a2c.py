@@ -16,10 +16,11 @@ import torch.nn.functional as F
 
 
 GAMMA = 0.99
-REWARD_STEPS = 2
-BATCH_SIZE = 32
-LEARNING_RATE = 5e-5
-ENTROPY_BETA = 1e-4
+REWARD_STEPS = 16
+BATCH_SIZE = 128
+LEARNING_RATE = 0.001
+ENTROPY_BETA = 1e-3
+NUM_ENVS = 100
 
 TEST_ITERS = 1000
 
@@ -61,16 +62,21 @@ if __name__ == "__main__":
     save_path = os.path.join("saves", "a2c-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
-    common.register_env()
-    env = gym.make(common.ENV_ID)
-    test_env = gym.make(common.ENV_ID)
+    env_factories = [
+        lambda: gym.make("LunarLander-v2", continuous=True)
+        for _ in range(NUM_ENVS)
+    ]
 
-    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
+    #common.register_env()
+    env = gym.vector.SyncVectorEnv(env_factories)
+    test_env = gym.make("LunarLander-v2", continuous=True)
+
+    net = model.ModelA2C(env.observation_space.shape[1], env.action_space.shape[0]).to(device)
     print(net)
 
     writer = SummaryWriter(comment="-a2c_" + args.name)
     agent = model.AgentA2C(net, device=device)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.VectorExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
