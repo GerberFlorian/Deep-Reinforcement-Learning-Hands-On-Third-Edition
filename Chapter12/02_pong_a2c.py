@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-import gymnasium as gym
-import ptan
-from ptan.experience import VectorExperienceSourceFirstLast
-from ptan.common.utils import TBMeanTracker
-import numpy as np
-import argparse
-from torch.utils.tensorboard.writer import SummaryWriter
 
+import argparse
+
+import gymnasium as gym
+import numpy as np
+import ptan
 import torch
-import torch.nn.utils as nn_utils
 import torch.nn.functional as F
+import torch.nn.utils as nn_utils
 import torch.optim as optim
+from ptan.common.utils import TBMeanTracker
+from ptan.experience import VectorExperienceSourceFirstLast
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from lib import common
 
-GAMMA = 0.99
+GAMMA = 0.9
 LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
 BATCH_SIZE = 128
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     device = torch.device(args.dev)
 
     env_factories = [
-        lambda: ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
+        lambda: gym.make("LunarLander-v2")
         for _ in range(NUM_ENVS)
     ]
     if args.use_async:
@@ -43,7 +44,7 @@ if __name__ == "__main__":
         env = gym.vector.SyncVectorEnv(env_factories)
     writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
-    net = common.AtariA2C(env.single_observation_space.shape,
+    net = common.LunarLanderA2C(env.observation_space.shape[1],
                           env.single_action_space.n).to(device)
     print(net)
 
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 
     batch = []
 
-    with common.RewardTracker(writer, stop_reward=18) as tracker:
+    with common.RewardTracker(writer, stop_reward=150) as tracker:
         with TBMeanTracker(writer, batch_size=10) as tb_tracker:
             for step_idx, exp in enumerate(exp_source):
                 batch.append(exp)

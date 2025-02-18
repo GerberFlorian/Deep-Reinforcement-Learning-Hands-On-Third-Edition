@@ -75,6 +75,31 @@ class AtariA2C(nn.Module):
         conv_out = self.conv(xx)
         return self.policy(conv_out), self.value(conv_out)
 
+class LunarLanderA2C(nn.Module):
+    def __init__(self, input_size, n_actions: int):
+        super(LunarLanderA2C, self).__init__()
+
+
+        self.policy = nn.Sequential(
+            nn.Linear(input_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, n_actions)
+        )
+        self.value = nn.Sequential(
+            nn.Linear(input_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+
+    def forward(self, x: torch.ByteTensor) -> tt.Tuple[torch.Tensor, torch.Tensor]:
+        return self.policy(x), self.value(x)
+
 
 def unpack_batch(batch: tt.List[ExperienceFirstLast], net: AtariA2C,
                  device: torch.device, gamma: float, reward_steps: int):

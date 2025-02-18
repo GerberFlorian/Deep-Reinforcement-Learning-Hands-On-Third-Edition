@@ -13,6 +13,7 @@ import torch.optim as optim
 GAMMA = 0.99
 LEARNING_RATE = 0.01
 EPISODES_TO_TRAIN = 4
+STOP_LOSS = 150
 
 
 class PGN(nn.Module):
@@ -43,7 +44,7 @@ def calc_qvals(rewards: tt.List[float]) -> tt.List[float]:
 
 
 if __name__ == "__main__":
-    env = gym.make("CartPole-v1")
+    env = gym.make("LunarLander-v2")
     writer = SummaryWriter(comment="-cartpole-reinforce-baseline")
 
     net = PGN(env.observation_space.shape[0], env.action_space.n)
@@ -89,7 +90,7 @@ if __name__ == "__main__":
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
             writer.add_scalar("episodes", done_episodes, step_idx)
-            if mean_rewards > 450:
+            if mean_rewards > STOP_LOSS:
                 print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
                 break
 
