@@ -15,26 +15,37 @@ class ModelA2C(nn.Module):
         self.base = nn.Sequential(
             nn.Linear(obs_size, HID_SIZE),
             nn.ReLU(),
-            nn.Linear(HID_SIZE, HID_SIZE),
-            nn.ReLU(),
-            nn.Linear(HID_SIZE, HID_SIZE),
-            nn.ReLU(),
-            nn.Linear(HID_SIZE, HID_SIZE),
-            nn.ReLU(),
         )
         self.mu = nn.Sequential(
+            nn.Linear(obs_size, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, HID_SIZE),
+            nn.ReLU(),
             nn.Linear(HID_SIZE, act_size),
             nn.Tanh(),
         )
         self.var = nn.Sequential(
+            nn.Linear(obs_size, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, HID_SIZE),
+            nn.ReLU(),
             nn.Linear(HID_SIZE, act_size),
             nn.Softplus(),
         )
-        self.value = nn.Linear(HID_SIZE, 1)
+        self.value = nn.Sequential(nn.Linear(obs_size, HID_SIZE),
+                                   nn.ReLU(),
+                                   nn.Linear(HID_SIZE, HID_SIZE),
+                                   nn.ReLU(), nn.Linear(HID_SIZE, HID_SIZE),
+                                   nn.ReLU(),
+                                   nn.Linear(HID_SIZE, 1))
 
     def forward(self, x: torch.Tensor):
-        base_out = self.base(x)
-        return self.mu(base_out), self.var(base_out), self.value(base_out)
+        #base_out = self.base(x)
+        return self.mu(x), self.var(x), self.value(x)
 
 
 class DDPGActor(nn.Module):
@@ -124,6 +135,7 @@ class AgentDDPG(ptan.agent.BaseAgent):
     """
     Agent implementing Orstein-Uhlenbeck exploration process
     """
+
     def __init__(self, net: DDPGActor, device: torch.device = torch.device('cpu'),
                  ou_enabled: bool = True, ou_mu: float = 0.0, ou_teta: float = 0.15,
                  ou_sigma: float = 0.2, ou_epsilon: float = 1.0):
@@ -165,6 +177,7 @@ class AgentD4PG(ptan.agent.BaseAgent):
     """
     Agent implementing noisy agent
     """
+
     def __init__(self, net: DDPGActor, device: torch.device = torch.device("cpu"),
                  epsilon: float = 0.3):
         self.net = net

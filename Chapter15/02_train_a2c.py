@@ -15,10 +15,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 
+
 GAMMA = 0.99
 REWARD_STEPS = 16
 BATCH_SIZE = 128
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.005
 ENTROPY_BETA = 1e-3
 NUM_ENVS = 100
 
@@ -46,7 +47,7 @@ def test_net(net: model.ModelA2C, env: gym.Env, count: int = 10,
 
 
 def calc_logprob(mu_v: torch.Tensor, var_v: torch.Tensor, actions_v: torch.Tensor):
-    p1 = - ((mu_v - actions_v) ** 2) / (2*var_v.clamp(min=1e-3))
+    p1 = - ((mu_v - actions_v) ** 2) / (2*var_v.clamp(min=1e-6))
     p2 = - torch.log(torch.sqrt(2 * math.pi * var_v))
     return p1 + p2
 
@@ -69,7 +70,9 @@ if __name__ == "__main__":
 
     #common.register_env()
     env = gym.vector.SyncVectorEnv(env_factories)
+    env = gym.wrappers.TransformReward(env, lambda r: r / 100.0)
     test_env = gym.make("LunarLander-v2", continuous=True)
+    test_env = gym.wrappers.TransformReward(test_env, lambda r: r / 100.0)
 
     net = model.ModelA2C(env.observation_space.shape[1], env.action_space.shape[0]).to(device)
     print(net)
@@ -78,18 +81,21 @@ if __name__ == "__main__":
     agent = model.AgentA2C(net, device=device)
     exp_source = ptan.experience.VectorExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.RAdam(net.parameters(), lr=LEARNING_RATE)
 
     batch = []
     best_reward = None
     with ptan.common.utils.RewardTracker(writer) as tracker:
-        with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+        with ptan.common.utils.TBMeanTracker(writer, batch_size=BATCH_SIZE) as tb_tracker:
             for step_idx, exp in enumerate(exp_source):
                 rewards_steps = exp_source.pop_rewards_steps()
                 if rewards_steps:
                     rewards, steps = zip(*rewards_steps)
                     tb_tracker.track("episode_steps", steps[0], step_idx)
-                    tracker.reward(rewards[0], step_idx)
+                    mean_reward = tracker.reward(rewards[0], step_idx)
+
+                    if mean_reward is not None and mean_reward > STOP_REWARD:
+                        break
 
                 if step_idx % TEST_ITERS == 0:
                     ts = time.time()
@@ -117,7 +123,7 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
                 mu_v, var_v, value_v = net(states_v)
 
-                loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
+                loss_value_v = 0.5 * F.mse_loss(value_v.squeeze(-1), vals_ref_v)
                 adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
                 log_prob_v = adv_v * calc_logprob(mu_v, var_v, actions_v)
                 loss_policy_v = -log_prob_v.mean()
@@ -130,6 +136,7 @@ if __name__ == "__main__":
 
                 tb_tracker.track("advantage", adv_v, step_idx)
                 tb_tracker.track("values", value_v, step_idx)
+                tb_tracker.track("actions", actions_v, step_idx)
                 tb_tracker.track("batch_rewards", vals_ref_v, step_idx)
                 tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)

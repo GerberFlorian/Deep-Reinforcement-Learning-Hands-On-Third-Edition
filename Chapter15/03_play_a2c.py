@@ -14,8 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--record", help="If specified, sets the recording dir, default=Disabled")
     args = parser.parse_args()
 
-    common.register_env()
-    env = gym.make(common.ENV_ID, render_mode='rgb_array')
+    env = gym.make("LunarLander-v2", continuous=True, enable_wind=False, gravity=-5.0, render_mode="human")
     if args.record is not None:
         env = gym.wrappers.RecordVideo(env, video_folder=args.record)
 
